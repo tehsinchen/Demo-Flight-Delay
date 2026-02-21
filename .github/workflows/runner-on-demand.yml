@@ -1,0 +1,158 @@
+# name: On-demand EC2 Runner (Ephemeral, path-filtered)
+
+# on:
+#   push:
+#     branches: [ main ]
+#     # Trigger when any of these areas change
+#     paths:
+#       - 'Dockerfile'
+#       - 'images/**'
+#       - 'docker/**'
+#       - 'awscli/**'
+#       - 'terraform/**'
+
+# permissions:
+#   contents: read
+#   actions: write
+
+# env:
+#   AWS_REGION: ${{ secrets.AWS_REGION }}
+
+# jobs:
+#   paths-check:
+#     name: Detect changed areas
+#     runs-on: ubuntu-latest
+#     outputs:
+#       docker_changed:   ${{ steps.filter.outputs.docker }}
+#       awscli_changed:   ${{ steps.filter.outputs.awscli }}
+#       tf_changed:       ${{ steps.filter.outputs.tf }}
+#       any:              ${{ steps.any.outputs.any }}
+#     steps:
+#       - uses: actions/checkout@v4
+#       - id: filter
+#         uses: dorny/paths-filter@v3
+#         with:
+#           filters: |
+#             docker:
+#               - 'Dockerfile'
+#               - 'images/**'
+#               - 'docker/**'
+#             awscli:
+#               - 'awscli/**'
+#             tf:
+#               - 'terraform/**'
+#       - id: any
+#         run: |
+#           ANY=$([ "${{ steps.filter.outputs.docker }}" = "true" ] || \
+#                  [ "${{ steps.filter.outputs.awscli }}" = "true" ] || \
+#                  [ "${{ steps.filter.outputs.tf }}" = "true" ] && echo true || echo false)
+#           echo "any=$ANY" >> "$GITHUB_OUTPUT"
+
+#   start-runner:
+#     name: Start ephemeral EC2 runner
+#     needs: paths-check
+#     if: needs.paths-check.outputs.any == 'true'
+#     runs-on: ubuntu-latest
+#     outputs:
+#       label:            ${{ steps.start.outputs.label }}
+#       ec2-instance-id:  ${{ steps.start.outputs.ec2-instance-id }}
+#     steps:
+#       - name: Start EC2 (ephemeral self-hosted runner)
+#         id: start
+#         uses: machulav/ec2-github-runner@v2
+#         with:
+#           mode: start
+#           github-token: ${{ secrets.GITHUB_TOKEN }}
+#           # Use your golden AMI (packer output)
+#           ec2-image-id: ${{ secrets.RUNNER_AMI_ID }}
+#           # (8) instance size (set in Terraform; copy to repo variable for convenience)
+#           ec2-instance-type: ${{ vars.RUNNER_INSTANCE_TYPE }}
+#           subnet-id: ${{ secrets.RUNNER_SUBNET_ID }}
+#           security-group-id: ${{ secrets.RUNNER_SG_ID }}
+#           aws-region: ${{ env.AWS_REGION }}
+#           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#           iam-instance-profile-name: ${{ secrets.RUNNER_INSTANCE_PROFILE }}
+#           runner-label: ec2-ephemeral
+
+#   build:
+#     name: CI on ephemeral EC2 (single job)
+#     needs: [paths-check, start-runner]
+#     if: needs.paths-check.outputs.any == 'true'
+#     runs-on: ${{ needs.start-runner.outputs.label }}
+
+#     steps:
+#       - uses: actions/checkout@v4
+
+#       # Verify Python 3.13 + boto3 (AMI includes it)
+#       - name: Verify Python 3.13 and boto3
+#         run: |
+#           python3.13 --version
+#           python3.13 - <<'PY'
+#           import boto3, sys
+#           print("boto3 ok, Python:", sys.version)
+#           PY
+
+#       # Docker/ECR build & push (conditional)
+#       - name: Discover ECR repository URI
+#         if: needs.paths-check.outputs.docker_changed == 'true'
+#         id: ecr
+#         run: |
+#           URI=$(aws ecr describe-repositories \
+#             --repository-names "${{ secrets.ECR_REPOSITORY_NAME }}" \
+#             --query 'repositories[0].repositoryUri' \
+#             --output text --region "${{ env.AWS_REGION }}")
+#           echo "uri=$URI" >> "$GITHUB_OUTPUT"
+
+#       - name: ECR login
+#         if: needs.paths-check.outputs.docker_changed == 'true'
+#         run: |
+#           aws ecr get-login-password --region "${{ env.AWS_REGION }}" \
+#             | docker login --username AWS --password-stdin "${{ steps.ecr.outputs.uri }}"
+
+#       - name: Build & push image
+#         if: needs.paths-check.outputs.docker_changed == 'true'
+#         env:
+#           ECR_URI: ${{ steps.ecr.outputs.uri }}
+#         run: |
+#           IMAGE="${ECR_URI}:$(git rev-parse --short=7 HEAD)"
+#           LATEST="${ECR_URI}:latest"
+#           docker build -t "$IMAGE" .
+#           docker tag "$IMAGE" "$LATEST"
+#           docker push "$IMAGE"
+#           docker push "$LATEST"
+
+#       # AWS CLI commands (conditional)
+#       - name: Run AWS CLI scripts
+#         if: needs.paths-check.outputs.awscli_changed == 'true'
+#         run: |
+#           chmod +x awscli/*.sh || true
+#           for f in awscli/*.sh; do [ -f "$f" ] && echo ">>> $f" && "$f"; done
+#           aws sts get-caller-identity
+
+#       # Terraform (plan/validate) (conditional)
+#       - name: Terraform validate/plan
+#         if: needs.paths-check.outputs.tf_changed == 'true'
+#         working-directory: ./terraform
+#         run: |
+#           terraform --version
+#           terraform init -input=false
+#           terraform validate
+#           terraform plan -out plan.tfplan -input=false
+
+#   stop-runner:
+#     name: Stop EC2 runner
+#     if: always()
+#     needs: [start-runner, build]
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Stop EC2
+#         uses: machulav/ec2-github-runner@v2
+#         with:
+#           mode: stop
+#           github-token: ${{ secrets.GITHUB_TOKEN }}
+#           label: ${{ needs.start-runner.outputs.label }}
+#           ec2-instance-id: ${{ needs.start-runner.outputs.ec2-instance-id }}
+#           aws-region: ${{ env.AWS_REGION }}
+#           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
