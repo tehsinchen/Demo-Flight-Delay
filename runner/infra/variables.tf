@@ -15,5 +15,15 @@ variable "aws_region" {
 
 variable "runner_instance_type" {
   type    = string
-  default = "t3.small"
+  default = "t3.medium"
+}
+
+variable "runner_ami_id" {
+  type    = string
+  default = "ami-0c0af8a25e998c510"
+}
+
+variable "secret_name" {
+  type    = string
+  default = "github/runner/config"
 }

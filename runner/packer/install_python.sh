@@ -2,28 +2,34 @@
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
-# Deadsnakes PPA for Python 3.13 on Ubuntu 24.04
+# Prereqs
+apt-get update -y
+apt-get install -y --no-install-recommends software-properties-common ca-certificates curl
+
+# Keep system Python healthy: the distro setuptools provides _distutils_hack
+apt-get install -y --no-install-recommends python3-setuptools  # DO NOT pip-upgrade globally
+
+# Add Deadsnakes and install Python 3.13 + venv
 add-apt-repository -y ppa:deadsnakes/ppa
 apt-get update -y
+apt-get install -y --no-install-recommends python3.13 python3.13-venv python3.13-dev
 
-# Install Python 3.13; headers are useful for building native wheels
-apt-get install -y python3.13 python3.13-venv python3.13-dev
+# Create an isolated toolchain for your AMI (never touch system site-packages)
+PY313_VENV=/opt/py313
+python3.13 -m venv "${PY313_VENV}"
+# shellcheck disable=SC1090
+. "${PY313_VENV}/bin/activate"
 
-# Bootstrap pip for that interpreter, then upgrade core packaging tools
-python3.13 -m ensurepip --upgrade --default-pip
-python3.13 -m pip install --upgrade pip setuptools wheel
+# Modern packaging only INSIDE the venv
+pip install --upgrade pip setuptools wheel
 
-# Quick sanity
-python3.13 --version
-python3.13 -m pip --version
-
+# Install your build-time requirements (optional) if provided to Packer
 REQS="${1:-/tmp/requirements.txt}"
-if [[ ! -s "$REQS" ]]; then
-  echo "requirements.txt not found at $REQS (or empty)"; exit 1
+if [[ -s "$REQS" ]]; then
+  pip install --no-cache-dir -r "$REQS"
+  pip cache purge || true
 fi
 
-# Install globally into the Python 3.13 site-packages for this AMI
-python3.13 -m pip install --no-cache-dir -r "$REQS"
-
-# Optionally purge pip cache to keep the AMI small
-python3.13 -m pip cache purge || true
+# Quick sanity
+python --version
+pip --version
