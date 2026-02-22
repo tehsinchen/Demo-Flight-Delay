@@ -13,12 +13,23 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  SERVICE_ROOT: project/services
-
 jobs:
+  # ---- Define global constants once and reuse via `needs.globals.outputs.*` ----
+  globals:
+    name: Set Global Constants
+    runs-on: self-hosted
+    outputs:
+      service_root: ${{ steps.set.outputs.service_root }}
+    steps:
+      - id: set
+        name: Define SERVICE_ROOT
+        run: |
+          # >>> Change only this line when you move your services directory <<<
+          echo "service_root=project/services" >> "$GITHUB_OUTPUT"
+
   changes:
     name: Detect Changed Paths
+    needs: [globals]
     runs-on: self-hosted
     outputs:
       frontend: ${{ steps.filter.outputs.frontend }}
@@ -29,7 +40,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - name: Paths filter
         id: filter
         uses: dorny/paths-filter@v3
@@ -37,47 +47,47 @@ jobs:
           token: ${{ github.token }}
           filters: |
             frontend:
-              - '${{ env.SERVICE_ROOT }}/frontend/**'
+              - '${{ needs.globals.outputs.service_root }}/frontend/**'
             backend:
-              - '${{ env.SERVICE_ROOT }}/backend/**'
+              - '${{ needs.globals.outputs.service_root }}/backend/**'
             crawler:
-              - '${{ env.SERVICE_ROOT }}/crawler/**'
+              - '${{ needs.globals.outputs.service_root }}/crawler/**'
 
   # --- A) Build & Push images to ECR (only when changed) ---
   build_frontend:
-    needs: [changes]
+    needs: [globals, changes]
     if: ${{ needs.changes.outputs.frontend == 'true' }}
     name: Build & Push - frontend
     uses: ./.github/workflows/_build-and-push.yml
     with:
       service: frontend
-      context: ${{ env.SERVICE_ROOT }}/frontend
-      dockerfile: ${{ env.SERVICE_ROOT }}/frontend/Dockerfile
+      context: ${{ needs.globals.outputs.service_root }}/frontend
+      dockerfile: ${{ needs.globals.outputs.service_root }}/frontend/Dockerfile
       ecr-repo: ${{ vars.ECR_REPO_PREFIX }}/frontend
 
   build_backend:
-    needs: [changes]
+    needs: [globals, changes]
     if: ${{ needs.changes.outputs.backend == 'true' }}
     name: Build & Push - backend
     uses: ./.github/workflows/_build-and-push.yml
     with:
       service: backend
-      context: ${{ env.SERVICE_ROOT }}/backend
-      dockerfile: ${{ env.SERVICE_ROOT }}/backend/Dockerfile
+      context: ${{ needs.globals.outputs.service_root }}/backend
+      dockerfile: ${{ needs.globals.outputs.service_root }}/backend/Dockerfile
       ecr-repo: ${{ vars.ECR_REPO_PREFIX }}/backend
 
   build_crawler:
-    needs: [changes]
+    needs: [globals, changes]
     if: ${{ needs.changes.outputs.crawler == 'true' }}
     name: Build & Push - crawler
     uses: ./.github/workflows/_build-and-push.yml
     with:
       service: crawler
-      context: ${{ env.SERVICE_ROOT }}/crawler
-      dockerfile: ${{ env.SERVICE_ROOT }}/crawler/Dockerfile
+      context: ${{ needs.globals.outputs.service_root }}/crawler
+      dockerfile: ${{ needs.globals.outputs.service_root }}/crawler/Dockerfile
       ecr-repo: ${{ vars.ECR_REPO_PREFIX }}/crawler
 
-  # # --- B) Terraform (left functionally unchanged) ---
+  # --- B) Terraform (left as-is per your request) ---
   # terraform:
   #   needs: [changes]
   #   if: ${{ needs.changes.outputs.terraform == 'true' }}
@@ -89,7 +99,7 @@ jobs:
   #     apply: ${{ github.ref == 'refs/heads/main' }}
   #   secrets: inherit
 
-  # # --- C) K8s deploy per service (left functionally unchanged) ---
+  # --- C) K8s deploy per service (left as-is per your request) ---
   # deploy_frontend:
   #   needs: [build_frontend, changes]
   #   if: ${{ always() && needs.changes.outputs.frontend == 'true' }}
