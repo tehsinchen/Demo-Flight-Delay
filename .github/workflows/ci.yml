@@ -44,7 +44,7 @@ jobs:
 
       - name: Paths filter (push)
         if: ${{ github.event_name == 'push' }}
-        id: filter
+        id: filter_push
         uses: dorny/paths-filter@v3
         with:
           token: ${{ github.token }}
@@ -60,7 +60,7 @@ jobs:
 
       - name: Paths filter (PR)
         if: ${{ github.event_name == 'pull_request' }}
-        id: filter
+        id: filter_pr
         uses: dorny/paths-filter@v3
         with:
           token: ${{ github.token }}
@@ -110,55 +110,3 @@ jobs:
       dockerfile: ${{ needs.globals.outputs.service_root }}/crawler/Dockerfile
       ecr-repo: ${{ vars.ECR_REPO_PREFIX }}/crawler
     secrets: inherit
-
-  # --- B) Terraform (left as-is per your request) ---
-  # terraform:
-  #   needs: [changes]
-  #   if: ${{ needs.changes.outputs.terraform == 'true' }}
-  #   name: Terraform Plan/Apply
-  #   uses: ./.github/workflows/_terraform-apply.yml
-  #   with:
-  #     working-directory: ${{ vars.TF_WORKING_DIR }}
-  #     terraform-version: ${{ vars.TF_VERSION || '1.8.5' }}
-  #     apply: ${{ github.ref == 'refs/heads/main' }}
-  #   secrets: inherit
-
-  # --- C) K8s deploy per service (left as-is per your request) ---
-  # deploy_frontend:
-  #   needs: [build_frontend, changes]
-  #   if: ${{ always() && needs.changes.outputs.frontend == 'true' }}
-  #   name: Deploy frontend to K8s
-  #   uses: ./.github/workflows/_k8s-deploy.yml
-  #   with:
-  #     service: frontend
-  #     namespace: ${{ vars.K8S_NAMESPACE || 'default' }}
-  #     strategy: ${{ vars.K8S_DEPLOY_STRATEGY || 'kubectl' }}
-  #     manifest-path: ${{ vars.K8S_MANIFEST_PATHS_FRONTEND || '' }}
-  #     image: ${{ needs.build_frontend.outputs.image }}
-  #   secrets: inherit
-
-  # deploy_backend:
-  #   needs: [build_backend, changes]
-  #   if: ${{ always() && needs.changes.outputs.backend == 'true' }}
-  #   name: Deploy backend to K8s
-  #   uses: ./.github/workflows/_k8s-deploy.yml
-  #   with:
-  #     service: backend
-  #     namespace: ${{ vars.K8S_NAMESPACE || 'default' }}
-  #     strategy: ${{ vars.K8S_DEPLOY_STRATEGY || 'kubectl' }}
-  #     manifest-path: ${{ vars.K8S_MANIFEST_PATHS_BACKEND || '' }}
-  #     image: ${{ needs.build_backend.outputs.image }}
-  #   secrets: inherit
-
-  # deploy_crawler:
-  #   needs: [build_crawler, changes]
-  #   if: ${{ always() && needs.changes.outputs.crawler == 'true' }}
-  #   name: Deploy crawler to K8s
-  #   uses: ./.github/workflows/_k8s-deploy.yml
-  #   with:
-  #     service: crawler
-  #     namespace: ${{ vars.K8S_NAMESPACE || 'default' }}
-  #     strategy: ${{ vars.K8S_DEPLOY_STRATEGY || 'kubectl' }}
-  #     manifest-path: ${{ vars.K8S_MANIFEST_PATHS_CRAWLER || '' }}
-  #     image: ${{ needs.build_crawler.outputs.image }}
-  #   secrets: inherit
