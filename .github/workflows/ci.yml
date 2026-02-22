@@ -32,16 +32,16 @@ jobs:
     needs: [globals]
     runs-on: self-hosted
     outputs:
-      frontend: ${{ steps.filter.outputs.frontend }}
-      backend:  ${{ steps.filter.outputs.backend }}
-      crawler:  ${{ steps.filter.outputs.crawler }}
+      frontend: ${{ steps.norm.outputs.frontend }}
+      backend:  ${{ steps.norm.outputs.backend }}
+      crawler:  ${{ steps.norm.outputs.crawler }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          # Full history is fine; base/head will control compare range explicitly
           fetch-depth: 0
 
+      # --- Push event ---
       - name: Paths filter (push)
         if: ${{ github.event_name == 'push' }}
         id: filter_push
@@ -49,7 +49,7 @@ jobs:
         with:
           token: ${{ github.token }}
           base: ${{ github.event.before }}
-          head: ${{ github.sha }}
+          ref:  ${{ github.sha }}
           filters: |
             frontend:
               - '${{ needs.globals.outputs.service_root }}/frontend/**'
@@ -58,6 +58,7 @@ jobs:
             crawler:
               - '${{ needs.globals.outputs.service_root }}/crawler/**'
 
+      # --- PR event ---
       - name: Paths filter (PR)
         if: ${{ github.event_name == 'pull_request' }}
         id: filter_pr
@@ -65,7 +66,7 @@ jobs:
         with:
           token: ${{ github.token }}
           base: ${{ github.event.pull_request.base.sha }}
-          head: ${{ github.event.pull_request.head.sha }}
+          ref:  ${{ github.event.pull_request.head.sha }}
           filters: |
             frontend:
               - '${{ needs.globals.outputs.service_root }}/frontend/**'
@@ -74,10 +75,29 @@ jobs:
             crawler:
               - '${{ needs.globals.outputs.service_root }}/crawler/**'
 
+      # --- Normalize outputs to guaranteed 'true'/'false' ---
+      - name: Normalize filtered outputs
+        id: norm
+        shell: bash
+        run: |
+          FRONT='${{ steps.filter.outputs.frontend }}'
+          BACK='${{ steps.filter.outputs.backend }}'
+          CRAW='${{ steps.filter.outputs.crawler }}'
+          echo "frontend=${FRONT:-false}" >> $GITHUB_OUTPUT
+          echo "backend=${BACK:-false}" >> $GITHUB_OUTPUT
+          echo "crawler=${CRAW:-false}" >> $GITHUB_OUTPUT
+
+      # Optional: debug
+      - name: Debug normalized outputs
+        run: |
+          echo "frontend=${{ steps.norm.outputs.frontend }}"
+          echo "backend=${{ steps.norm.outputs.backend }}"
+          echo "crawler=${{ steps.norm.outputs.crawler }}"
+
   # --- A) Build & Push images to ECR (only when changed) ---
   build_frontend:
     needs: [globals, changes]
-    if: ${{ needs.changes.outputs.frontend == 'true' }}
+    if: ${{ fromJSON(needs.changes.outputs.frontend) }}
     name: Build & Push - frontend
     uses: ./.github/workflows/_build-and-push.yml
     with:
@@ -89,7 +109,7 @@ jobs:
 
   build_backend:
     needs: [globals, changes]
-    if: ${{ needs.changes.outputs.backend == 'true' }}
+    if: ${{ fromJSON(needs.changes.outputs.backend) }}
     name: Build & Push - backend
     uses: ./.github/workflows/_build-and-push.yml
     with:
@@ -101,7 +121,7 @@ jobs:
 
   build_crawler:
     needs: [globals, changes]
-    if: ${{ needs.changes.outputs.crawler == 'true' }}
+    if: ${{ fromJSON(needs.changes.outputs.crawler) }
     name: Build & Push - crawler
     uses: ./.github/workflows/_build-and-push.yml
     with:
