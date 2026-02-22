@@ -3,8 +3,6 @@ name: CI Orchestrator
 on:
   push:
     branches: [ main, dev ]
-  pull_request:
-    branches: [ main ]
 
 permissions:
   contents: read
@@ -26,7 +24,6 @@ jobs:
         run: |
           # >>> Change only this line when you move your services directory <<<
           echo "service_root=project/services" >> "$GITHUB_OUTPUT"
-
   changes:
     name: Detect Changed Paths
     needs: [globals]
@@ -44,29 +41,12 @@ jobs:
       # --- Push event ---
       - name: Paths filter (push)
         if: ${{ github.event_name == 'push' }}
-        id: filter_push
+        id: filter
         uses: dorny/paths-filter@v3
         with:
           token: ${{ github.token }}
           base: ${{ github.event.before }}
           ref:  ${{ github.sha }}
-          filters: |
-            frontend:
-              - '${{ needs.globals.outputs.service_root }}/frontend/**'
-            backend:
-              - '${{ needs.globals.outputs.service_root }}/backend/**'
-            crawler:
-              - '${{ needs.globals.outputs.service_root }}/crawler/**'
-
-      # --- PR event ---
-      - name: Paths filter (PR)
-        if: ${{ github.event_name == 'pull_request' }}
-        id: filter_pr
-        uses: dorny/paths-filter@v3
-        with:
-          token: ${{ github.token }}
-          base: ${{ github.event.pull_request.base.sha }}
-          ref:  ${{ github.event.pull_request.head.sha }}
           filters: |
             frontend:
               - '${{ needs.globals.outputs.service_root }}/frontend/**'
@@ -86,8 +66,6 @@ jobs:
           echo "frontend=${FRONT:-false}" >> $GITHUB_OUTPUT
           echo "backend=${BACK:-false}" >> $GITHUB_OUTPUT
           echo "crawler=${CRAW:-false}" >> $GITHUB_OUTPUT
-
-      # Optional: debug
       - name: Debug normalized outputs
         run: |
           echo "frontend=${{ steps.norm.outputs.frontend }}"
