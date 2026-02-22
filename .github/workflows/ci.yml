@@ -121,7 +121,7 @@ jobs:
 
   build_crawler:
     needs: [globals, changes]
-    if: ${{ fromJSON(needs.changes.outputs.crawler) }
+    if: ${{ fromJSON(needs.changes.outputs.crawler) }}
     name: Build & Push - crawler
     uses: ./.github/workflows/_build-and-push.yml
     with:
