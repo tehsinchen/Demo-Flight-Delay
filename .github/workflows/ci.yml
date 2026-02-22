@@ -34,7 +34,7 @@ jobs:
         id: filter
         uses: dorny/paths-filter@v3
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ github.token }}
           filters: |
             frontend:
               - '${{ env.SERVICE_ROOT }}/frontend/**'
@@ -43,11 +43,11 @@ jobs:
             crawler:
               - '${{ env.SERVICE_ROOT }}/crawler/**'
 
-  # --- Build & Push ---
+  # --- A) Build & Push images to ECR (only when changed) ---
   build_frontend:
     needs: [changes]
     if: ${{ needs.changes.outputs.frontend == 'true' }}
-    runs-on: self-hosted
+    name: Build & Push - frontend
     uses: ./.github/workflows/_build-and-push.yml
     with:
       service: frontend
@@ -58,7 +58,7 @@ jobs:
   build_backend:
     needs: [changes]
     if: ${{ needs.changes.outputs.backend == 'true' }}
-    runs-on: self-hosted
+    name: Build & Push - backend
     uses: ./.github/workflows/_build-and-push.yml
     with:
       service: backend
@@ -69,7 +69,7 @@ jobs:
   build_crawler:
     needs: [changes]
     if: ${{ needs.changes.outputs.crawler == 'true' }}
-    runs-on: self-hosted
+    name: Build & Push - crawler
     uses: ./.github/workflows/_build-and-push.yml
     with:
       service: crawler
@@ -77,11 +77,11 @@ jobs:
       dockerfile: ${{ env.SERVICE_ROOT }}/crawler/Dockerfile
       ecr-repo: ${{ vars.ECR_REPO_PREFIX }}/crawler
 
-  # # --- Terraform & K8s: left as-is per your request ---
+  # # --- B) Terraform (left functionally unchanged) ---
   # terraform:
   #   needs: [changes]
   #   if: ${{ needs.changes.outputs.terraform == 'true' }}
-  #   runs-on: self-hosted
+  #   name: Terraform Plan/Apply
   #   uses: ./.github/workflows/_terraform-apply.yml
   #   with:
   #     working-directory: ${{ vars.TF_WORKING_DIR }}
@@ -89,10 +89,11 @@ jobs:
   #     apply: ${{ github.ref == 'refs/heads/main' }}
   #   secrets: inherit
 
+  # # --- C) K8s deploy per service (left functionally unchanged) ---
   # deploy_frontend:
   #   needs: [build_frontend, changes]
   #   if: ${{ always() && needs.changes.outputs.frontend == 'true' }}
-  #   runs-on: self-hosted
+  #   name: Deploy frontend to K8s
   #   uses: ./.github/workflows/_k8s-deploy.yml
   #   with:
   #     service: frontend
@@ -105,7 +106,7 @@ jobs:
   # deploy_backend:
   #   needs: [build_backend, changes]
   #   if: ${{ always() && needs.changes.outputs.backend == 'true' }}
-  #   runs-on: self-hosted
+  #   name: Deploy backend to K8s
   #   uses: ./.github/workflows/_k8s-deploy.yml
   #   with:
   #     service: backend
@@ -118,7 +119,7 @@ jobs:
   # deploy_crawler:
   #   needs: [build_crawler, changes]
   #   if: ${{ always() && needs.changes.outputs.crawler == 'true' }}
-  #   runs-on: self-hosted
+  #   name: Deploy crawler to K8s
   #   uses: ./.github/workflows/_k8s-deploy.yml
   #   with:
   #     service: crawler
