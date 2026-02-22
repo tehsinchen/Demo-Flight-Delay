@@ -1,0 +1,9 @@
+certifi==2026.1.4
+cffi==2.0.0
+cryptography==46.0.3
+curl_cffi==0.14.0
+pycparser==2.23
+PyMySQL==1.1.2
+python-dotenv==1.2.1
+pytz==2025.2
+PyYAML==6.0.3

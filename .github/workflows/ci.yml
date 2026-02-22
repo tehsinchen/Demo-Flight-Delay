@@ -1,0 +1,129 @@
+name: CI Orchestrator
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SERVICE_ROOT: project/services
+
+jobs:
+  changes:
+    name: Detect Changed Paths
+    runs-on: self-hosted
+    outputs:
+      frontend: ${{ steps.filter.outputs.frontend }}
+      backend:  ${{ steps.filter.outputs.backend }}
+      crawler:  ${{ steps.filter.outputs.crawler }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Paths filter
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          filters: |
+            frontend:
+              - '${{ env.SERVICE_ROOT }}/frontend/**'
+            backend:
+              - '${{ env.SERVICE_ROOT }}/backend/**'
+            crawler:
+              - '${{ env.SERVICE_ROOT }}/crawler/**'
+
+  # --- Build & Push ---
+  build_frontend:
+    needs: [changes]
+    if: ${{ needs.changes.outputs.frontend == 'true' }}
+    runs-on: self-hosted
+    uses: ./.github/workflows/_build-and-push.yml
+    with:
+      service: frontend
+      context: ${{ env.SERVICE_ROOT }}/frontend
+      dockerfile: ${{ env.SERVICE_ROOT }}/frontend/Dockerfile
+      ecr-repo: ${{ vars.ECR_REPO_PREFIX }}/frontend
+
+  build_backend:
+    needs: [changes]
+    if: ${{ needs.changes.outputs.backend == 'true' }}
+    runs-on: self-hosted
+    uses: ./.github/workflows/_build-and-push.yml
+    with:
+      service: backend
+      context: ${{ env.SERVICE_ROOT }}/backend
+      dockerfile: ${{ env.SERVICE_ROOT }}/backend/Dockerfile
+      ecr-repo: ${{ vars.ECR_REPO_PREFIX }}/backend
+
+  build_crawler:
+    needs: [changes]
+    if: ${{ needs.changes.outputs.crawler == 'true' }}
+    runs-on: self-hosted
+    uses: ./.github/workflows/_build-and-push.yml
+    with:
+      service: crawler
+      context: ${{ env.SERVICE_ROOT }}/crawler
+      dockerfile: ${{ env.SERVICE_ROOT }}/crawler/Dockerfile
+      ecr-repo: ${{ vars.ECR_REPO_PREFIX }}/crawler
+
+  # # --- Terraform & K8s: left as-is per your request ---
+  # terraform:
+  #   needs: [changes]
+  #   if: ${{ needs.changes.outputs.terraform == 'true' }}
+  #   runs-on: self-hosted
+  #   uses: ./.github/workflows/_terraform-apply.yml
+  #   with:
+  #     working-directory: ${{ vars.TF_WORKING_DIR }}
+  #     terraform-version: ${{ vars.TF_VERSION || '1.8.5' }}
+  #     apply: ${{ github.ref == 'refs/heads/main' }}
+  #   secrets: inherit
+
+  # deploy_frontend:
+  #   needs: [build_frontend, changes]
+  #   if: ${{ always() && needs.changes.outputs.frontend == 'true' }}
+  #   runs-on: self-hosted
+  #   uses: ./.github/workflows/_k8s-deploy.yml
+  #   with:
+  #     service: frontend
+  #     namespace: ${{ vars.K8S_NAMESPACE || 'default' }}
+  #     strategy: ${{ vars.K8S_DEPLOY_STRATEGY || 'kubectl' }}
+  #     manifest-path: ${{ vars.K8S_MANIFEST_PATHS_FRONTEND || '' }}
+  #     image: ${{ needs.build_frontend.outputs.image }}
+  #   secrets: inherit
+
+  # deploy_backend:
+  #   needs: [build_backend, changes]
+  #   if: ${{ always() && needs.changes.outputs.backend == 'true' }}
+  #   runs-on: self-hosted
+  #   uses: ./.github/workflows/_k8s-deploy.yml
+  #   with:
+  #     service: backend
+  #     namespace: ${{ vars.K8S_NAMESPACE || 'default' }}
+  #     strategy: ${{ vars.K8S_DEPLOY_STRATEGY || 'kubectl' }}
+  #     manifest-path: ${{ vars.K8S_MANIFEST_PATHS_BACKEND || '' }}
+  #     image: ${{ needs.build_backend.outputs.image }}
+  #   secrets: inherit
+
+  # deploy_crawler:
+  #   needs: [build_crawler, changes]
+  #   if: ${{ always() && needs.changes.outputs.crawler == 'true' }}
+  #   runs-on: self-hosted
+  #   uses: ./.github/workflows/_k8s-deploy.yml
+  #   with:
+  #     service: crawler
+  #     namespace: ${{ vars.K8S_NAMESPACE || 'default' }}
+  #     strategy: ${{ vars.K8S_DEPLOY_STRATEGY || 'kubectl' }}
+  #     manifest-path: ${{ vars.K8S_MANIFEST_PATHS_CRAWLER || '' }}
+  #     image: ${{ needs.build_crawler.outputs.image }}
+  #   secrets: inherit

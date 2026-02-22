@@ -1,0 +1,91 @@
+name: _build-and-push
+on:
+  workflow_call:
+    inputs:
+      service:
+        required: true
+        type: string
+      context:
+        required: true
+        type: string
+      dockerfile:
+        required: true
+        type: string
+      ecr-repo:
+        required: true
+        type: string
+    outputs:
+      image:
+        description: "Pushed image reference"
+        value: ${{ jobs.build.outputs.image }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: self-hosted
+    outputs:
+      image: ${{ steps.out.outputs.image }}
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com
+      ECR_REPO: ${{ inputs.ecr-repo }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Uses EC2 instance role credentials available on the runner
+      - name: Verify AWS identity (optional)
+        shell: bash
+        run: |
+          set -euo pipefail
+          aws sts get-caller-identity
+
+      - name: Ensure ECR repository exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! aws ecr describe-repositories --repository-names "$ECR_REPO" >/dev/null 2>&1; then
+            aws ecr create-repository --repository-name "$ECR_REPO" >/dev/null
+            echo "Created ECR repo: $ECR_REPO"
+          fi
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+        with:
+          registry-type: public # ignored for private, but safe to leave
+        # The action will use instance role creds from the environment
+
+      - name: Set tags
+        id: tags
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAGS="${ECR_REGISTRY}/${ECR_REPO}:${GITHUB_SHA}"
+          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            TAGS="${TAGS}\n${ECR_REGISTRY}/${ECR_REPO}:latest"
+          fi
+          echo -e "tags<<EOF" >> $GITHUB_OUTPUT
+          echo -e "${TAGS}" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Build & Push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ inputs.context }}
+          file: ${{ inputs.dockerfile }}
+          push: true
+          provenance: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: ${{ steps.tags.outputs.tags }}
+
+      - name: Output final image ref
+        id: out
+        shell: bash
+        run: |
+          IMAGE="${ECR_REGISTRY}/${ECR_REPO}:${GITHUB_SHA}"
+          echo "image=${IMAGE}" >> $GITHUB_OUTPUT
+          echo "Built and pushed ${IMAGE}"

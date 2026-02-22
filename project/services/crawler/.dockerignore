@@ -1,0 +1,30 @@
+# Python
+**pycache**/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+
+# Git
+.git/
+.gitignore
+
+# OS / Editor
+.DS_Store
+.vscode/
+.idea/
+
+# Docker
+Dockerfile
+docker-compose.yml
+
+# Environment variables
+# .env
+# **/*.env
+
+# Tests / Docs (optional)
+tests/
+docs/

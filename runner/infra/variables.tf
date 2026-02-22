@@ -20,7 +20,7 @@ variable "runner_instance_type" {
 
 variable "runner_ami_id" {
   type    = string
-  default = "ami-0c0af8a25e998c510"
+  default = "ami-05bcc118c5d3cb7a1"
 }
 
 variable "secret_name" {
