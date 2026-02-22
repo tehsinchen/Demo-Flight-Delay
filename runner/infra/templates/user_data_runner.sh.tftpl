@@ -66,28 +66,14 @@ else
       --token '$REG_TOKEN' --name '$RUNNER_NAME' --work '$WORKDIR'"
 fi
 
-# --- F) Start as a service (svc.sh or fallback custom unit) ---
+# --- F) Start as a service ---
 if [ -x ./svc.sh ]; then
-  echo "svc.sh present → installing service for user 'github'"
-  sudo -u github -H bash -lc "./svc.sh install"
-  sudo -u github -H bash -lc "./svc.sh start"
+  echo "svc.sh present → installing service for user github"
+  sudo ./svc.sh install github
+  sudo ./svc.sh start
+  sudo ./svc.sh status
+
+  echo "=== GH runner bootstrap FINISHED: $(date -Is) ==="
 else
-  echo "WARN: svc.sh not found; creating a systemd unit for runsvc.sh"
-
-[Unit]
-Description=GitHub Actions Runner ($OWNER/$REPO) - $RUNNER_NAME
-After=network.target
-[Service]
-ExecStart=$RUNNER_DIR/runsvc.sh
-WorkingDirectory=$RUNNER_DIR
-User=github
-KillMode=process
-TimeoutStopSec=5min
-[Install]
-WantedBy=multi-user.target
-EOF
-  systemctl daemon-reload
-  systemctl enable --now "$UNIT"
+  echo "WARN: svc.sh not found"
 fi
-
-echo "=== GH runner bootstrap FINISHED: $(date -Is) ==="

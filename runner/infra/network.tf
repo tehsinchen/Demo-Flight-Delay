@@ -19,7 +19,7 @@ locals {
 }
 
 resource "aws_security_group" "runner" {
-  name        = "${local.name}-runner-sg"
+  name        = "${var.project}-runner-sg"
   description = "Self-hosted runner SG (no inbound; SSM only)"
   vpc_id      = data.aws_vpc.default.id
 

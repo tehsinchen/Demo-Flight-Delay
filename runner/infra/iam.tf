@@ -10,7 +10,7 @@ data "aws_iam_policy_document" "ec2_assume" {
 }
 
 resource "aws_iam_role" "ec2_runner_role" {
-  name               = "${local.name}-ec2-runner-role"
+  name               = "${var.project}-ec2-runner-role"
   assume_role_policy = data.aws_iam_policy_document.ec2_assume.json
 }
 
@@ -25,7 +25,7 @@ resource "aws_iam_role_policy_attachment" "cw_agent" {
 }
 
 resource "aws_iam_policy" "ecr_rw" {
-  name = "${local.name}-ecr-rw"
+  name = "${var.project}-ecr-rw"
   policy = jsonencode({
     Version = "2012-10-17",
     Statement = [{
@@ -42,7 +42,7 @@ resource "aws_iam_role_policy_attachment" "ecr_rw_attach" {
 
 
 resource "aws_iam_policy" "read_secret_sm" {
-  name = "${local.name}-read-github-sm"
+  name = "${var.project}-read-github-sm"
   policy = jsonencode({
     Version = "2012-10-17",
     Statement = [{
@@ -60,7 +60,7 @@ resource "aws_iam_role_policy_attachment" "read_secret_sm_attach" {
 
 
 resource "aws_iam_instance_profile" "ec2_runner_profile" {
-  name = "${local.name}-ec2-runner-profile"
+  name = "${var.project}-ec2-runner-profile"
   role = aws_iam_role.ec2_runner_role.name
 }
 
@@ -80,6 +80,6 @@ data "aws_iam_policy_document" "gha_runner_actions" {
 }
 
 resource "aws_iam_policy" "gha_runner_actions" {
-  name   = "${local.name}-gha-ec2-actions"
+  name   = "${var.project}-gha-ec2-actions"
   policy = data.aws_iam_policy_document.gha_runner_actions.json
 }

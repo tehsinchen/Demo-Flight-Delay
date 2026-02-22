@@ -1,9 +1,0 @@
-# output "aws_region" { value = var.aws_region }
-# output "runner_subnet_id" { value = local.runner_subnet_id }
-# output "runner_security_group_id" { value = aws_security_group.runner.id }
-# output "runner_instance_profile_name" { value = aws_iam_instance_profile.ec2_runner_profile.name }
-# output "runner_instance_profile_arn" { value = aws_iam_instance_profile.ec2_runner_profile.arn }
-# output "runner_instance_type" { value = var.runner_instance_type }
-# output "runner_instance_id" { value = aws_instance.runner.id }
-# output "runner_private_ip" { value = aws_instance.runner.private_ip }
-# output "runner_public_ip" { value = aws_instance.runner.public_ip }
