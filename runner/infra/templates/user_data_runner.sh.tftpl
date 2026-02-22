@@ -54,7 +54,41 @@ REG_TOKEN=$(curl -fsSL -X POST \
   "https://api.github.com/repos/$OWNER/$REPO/actions/runners/registration-token" | jq -r .token)
 [ -n "$REG_TOKEN" ] && [ "$REG_TOKEN" != "null" ] || { echo "FATAL: failed to fetch registration token"; exit 1; }
 
-# --- E) Register the runner (this step CREATES svc.sh) as user 'github' ---
+# --- E) Ensure Docker daemon is ready and grant 'github' access to Docker socket ---
+echo "[INFO] Ensuring Docker service and permissions…"
+# Ensure the docker group exists (should already, but safe to enforce)
+if ! getent group docker >/dev/null; then
+  groupadd docker
+fi
+
+# Add 'github' to docker group (so it can access /var/run/docker.sock without sudo)
+usermod -aG docker github || { echo "FATAL: failed to add 'github' to docker group"; exit 1; }
+
+# Make sure Docker is enabled and running
+if ! systemctl is-enabled docker >/dev/null 2>&1; then
+  systemctl enable docker || true
+fi
+systemctl start docker
+systemctl is-active --quiet docker || { echo "FATAL: docker service is not active"; exit 1; }
+
+# Debug socket and versions (as root)
+ls -l /var/run/docker.sock || true
+docker --version
+docker compose version || true
+docker buildx version || true
+docker version   # prints client+server if daemon reachable
+
+# Sanity check Docker access as 'github' (new session picks up fresh groups)
+sudo -u github -H bash -lc '
+  set -e
+  echo "[INFO] Verifying Docker access as $(whoami)…"
+  id
+  docker version
+  docker buildx ls || true
+'
+echo "[INFO] Docker daemon and access OK."
+
+# --- F) Register the runner (this step CREATES svc.sh) as user 'github' ---
 cd "$RUNNER_DIR"
 if [ -n "$LABELS" ]; then
   sudo -u github -H bash -lc \
@@ -66,7 +100,7 @@ else
       --token '$REG_TOKEN' --name '$RUNNER_NAME' --work '$WORKDIR'"
 fi
 
-# --- F) Start as a service ---
+# --- G) Start as a service ---
 if [ -x ./svc.sh ]; then
   echo "svc.sh present → installing service for user github"
   sudo ./svc.sh install github
