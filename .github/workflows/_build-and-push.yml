@@ -36,7 +36,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Uses EC2 instance role credentials available on the runner
       - name: Verify AWS identity (optional)
         shell: bash
         run: |
@@ -52,11 +51,9 @@ jobs:
             echo "Created ECR repo: $ECR_REPO"
           fi
 
-      - name: Login to ECR
+      - name: Login to private ECR
         uses: aws-actions/amazon-ecr-login@v2
-        with:
-          registry-type: public # ignored for private, but safe to leave
-        # The action will use instance role creds from the environment
+        # (no registry-type: public) => logs in to PRIVATE ECR in your region/account
 
       - name: Set tags
         id: tags

@@ -39,12 +39,33 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          # Full history is fine; base/head will control compare range explicitly
           fetch-depth: 0
-      - name: Paths filter
+
+      - name: Paths filter (push)
+        if: ${{ github.event_name == 'push' }}
         id: filter
         uses: dorny/paths-filter@v3
         with:
           token: ${{ github.token }}
+          base: ${{ github.event.before }}
+          head: ${{ github.sha }}
+          filters: |
+            frontend:
+              - '${{ needs.globals.outputs.service_root }}/frontend/**'
+            backend:
+              - '${{ needs.globals.outputs.service_root }}/backend/**'
+            crawler:
+              - '${{ needs.globals.outputs.service_root }}/crawler/**'
+
+      - name: Paths filter (PR)
+        if: ${{ github.event_name == 'pull_request' }}
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          token: ${{ github.token }}
+          base: ${{ github.event.pull_request.base.sha }}
+          head: ${{ github.event.pull_request.head.sha }}
           filters: |
             frontend:
               - '${{ needs.globals.outputs.service_root }}/frontend/**'
@@ -64,6 +85,7 @@ jobs:
       context: ${{ needs.globals.outputs.service_root }}/frontend
       dockerfile: ${{ needs.globals.outputs.service_root }}/frontend/Dockerfile
       ecr-repo: ${{ vars.ECR_REPO_PREFIX }}/frontend
+    secrets: inherit
 
   build_backend:
     needs: [globals, changes]
@@ -75,6 +97,7 @@ jobs:
       context: ${{ needs.globals.outputs.service_root }}/backend
       dockerfile: ${{ needs.globals.outputs.service_root }}/backend/Dockerfile
       ecr-repo: ${{ vars.ECR_REPO_PREFIX }}/backend
+    secrets: inherit
 
   build_crawler:
     needs: [globals, changes]
@@ -86,6 +109,7 @@ jobs:
       context: ${{ needs.globals.outputs.service_root }}/crawler
       dockerfile: ${{ needs.globals.outputs.service_root }}/crawler/Dockerfile
       ecr-repo: ${{ vars.ECR_REPO_PREFIX }}/crawler
+    secrets: inherit
 
   # --- B) Terraform (left as-is per your request) ---
   # terraform:
