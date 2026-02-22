@@ -60,10 +60,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          TAGS="${ECR_REGISTRY}/${ECR_REPO}:${GITHUB_SHA}"
-          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
-            TAGS="${TAGS}\n${ECR_REGISTRY}/${ECR_REPO}:latest"
-          fi
+          TAGS="${ECR_REGISTRY}/${ECR_REPO}:latest"
           echo -e "tags<<EOF" >> $GITHUB_OUTPUT
           echo -e "${TAGS}" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
