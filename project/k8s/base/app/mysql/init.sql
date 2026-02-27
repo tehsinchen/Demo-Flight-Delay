@@ -158,3 +158,18 @@ BEGIN
 END $$
 
 DELIMITER ;
+
+-- User
+CREATE USER IF NOT EXISTS 'backend_ro'@'%' IDENTIFIED BY 'backend_ro_pw';
+CREATE USER IF NOT EXISTS 'crawler_rw'@'%' IDENTIFIED BY 'crawler_rw_pw';
+
+-- Backend: read-only
+GRANT SELECT ON flight_ops.* TO 'backend_ro'@'%';
+GRANT EXECUTE ON flight_ops.* TO 'backend_ro'@'%';
+
+-- Crawler: read/write (tune as needed)
+GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, DROP
+  ON flight_ops.* TO 'crawler_rw'@'%';
+GRANT EXECUTE ON flight_ops.* TO 'crawler_rw'@'%';
+
+FLUSH PRIVILEGES;

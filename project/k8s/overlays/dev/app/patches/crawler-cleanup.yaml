@@ -1,0 +1,10 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: crawler
+spec:
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 900

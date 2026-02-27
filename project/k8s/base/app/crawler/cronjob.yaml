@@ -1,0 +1,63 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: crawler
+  labels:
+    app: crawler
+spec:
+  schedule: "*/30 * * * *"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 300
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      backoffLimit: 3
+      activeDeadlineSeconds: 1200
+      ttlSecondsAfterFinished: 3600
+      template:
+        metadata:
+          labels:
+            app: crawler
+        spec:
+          serviceAccountName: crawler-sa
+          restartPolicy: OnFailure
+          initContainers:
+            - name: wait-for-db
+              image: mysql:latest
+              imagePullPolicy: IfNotPresent
+              env:
+                - name: MYSQL_ROOT_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: mysql-secret
+                      key: MYSQL_ROOT_PASSWORD
+              command: ["sh","-c","until mysqladmin ping -h db -u root -p\"${MYSQL_ROOT_PASSWORD}\" --silent; do sleep 2; done"]
+          containers:
+            - name: crawler
+              image: crawler:latest
+              imagePullPolicy: IfNotPresent
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
+              env:
+                - name: DB_HOST
+                  value: "db"
+                - name: DB_PORT
+                  value: "3306"
+                - name: DB_NAME
+                  valueFrom:
+                    secretKeyRef:
+                      name: mysql-secret
+                      key: MYSQL_DATABASE
+                - name: DB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: mysql-secret
+                      key: CRAWLER_DB_USER
+                - name: DB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: mysql-secret
+                      key: CRAWLER_DB_PASSWORD

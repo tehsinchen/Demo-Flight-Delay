@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List, Optional
+import os
 
 class Settings(BaseSettings):
     # General
@@ -7,10 +8,10 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
 
     # CORS
-    CORS_ALLOW_ORIGINS: List[str] = ["*"]
+    CORS_ALLOW_ORIGINS: List[str] = ["http://frontend:3000"]
 
     # Database
-    DATABASE_URL: str  # e.g., mysql+pymysql://user:pass@host:3306/db
+    DATABASE_URL: str = os.getenv("DATABASE_URL") # e.g., mysql+pymysql://user:pass@host:3306/db
 
     # Connection pool tuning
     POOL_SIZE: int = 10

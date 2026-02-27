@@ -37,3 +37,54 @@ aws secretsmanager create-secret \
   }' \
   --region ap-southeast-1
 ```
+<!-- =============
+# FlightOps Demo on Single EC2 (k3s + ArgoCD + Traefik)
+
+This repo boots a **single EC2 instance** (Amazon Linux 2023) with **k3s** and **ArgoCD** baked into a **golden AMI**.  
+Your app deploys automatically from **ArgoCD** pointing at your **public GitHub repo**, and is reachable at:
+
+- **Frontend**: `http://<public-ip>/`
+- **ArgoCD UI**: `http://<public-ip>/argocd`
+
+No SSH required — **SSM Session Manager** only.  
+Images are pulled from **ECR** repos:
+
+- `flight-ops/frontend:latest`
+- `flight-ops/backend:latest`
+- `flight-ops/crawler:latest`
+
+---
+
+## What gets created
+
+- **Golden AMI** with:
+  - **k3s** (Traefik + ServiceLB) → exposes host **port 80** (no port number in URL)
+  - **ArgoCD** (pinned `v2.9.6`), served on `/argocd` path (HTTP)
+  - **First-boot systemd** service:
+    - Starts k3s
+    - Applies ArgoCD manifests & Ingress
+    - Creates an **ArgoCD Application** (auto-sync, prune, self-heal)
+    - Overrides images to your **ECR** repos
+    - Sets up an **ECR pull-secret refresher** to handle expiring tokens
+- **EC2 instance** in **default VPC public subnet** with **ephemeral public IP**, HTTP open.
+- **IAM instance profile**: SSM access + ECR read
+- **ECR repositories** with lifecycle to aggressively delete **untagged** images
+- **Terraform outputs**: frontend & ArgoCD URLs + repo URIs
+
+---
+
+## Prerequisites
+
+- **AWS CLI v2**, **Packer ≥ 1.9**, **Terraform ≥ 1.6**
+- An AWS account with permissions to create IAM roles, ECR repos, and EC2 instances
+- Your **app GitHub repo** is **public**
+
+---
+
+## 1) Build the golden AMI (Packer)
+
+```bash
+cd packer
+packer init .
+packer build -var "region=ap-southeast-1" al2023-k3s-argocd.pkr.hcl
+``` -->
