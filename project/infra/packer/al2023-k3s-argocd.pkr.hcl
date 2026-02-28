@@ -56,10 +56,6 @@ build {
     source      = "${path.root}/files/argocd-networking.yaml"
     destination = "/tmp/networking.yaml"
   }
-  provisioner "file" {
-    source      = "${path.root}/files/argocd-app-template.yaml"
-    destination = "/tmp/argocd-app-template.yaml"
-  }
   provisioner "shell" {
     script          = "${path.root}/scripts/prep_base.sh"
     execute_command = "sudo -E bash '{{ .Path }}'"
@@ -72,11 +68,6 @@ build {
 
   provisioner "shell" {
     script          = "${path.root}/scripts/setup_argocd.sh"
-    execute_command = "sudo -E bash '{{ .Path }}'"
-  }
-
-  provisioner "shell" {
-    script          = "${path.root}/scripts/setup_firstboot.sh"
     execute_command = "sudo -E bash '{{ .Path }}'"
   }
 }

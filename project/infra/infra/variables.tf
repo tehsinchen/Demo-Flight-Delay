@@ -38,10 +38,12 @@ variable "git_app" {
     url      = string # e.g., https://github.com/your-org/your-repo.git
     revision = string # e.g., main
     path     = string # e.g., overlays/dev or overlays/prod
+    ns       = string # e.g., flightops-dev
   })
   default = {
     url      = "https://github.com/tehsinchen/Demo-Flight-Delay.git"
     revision = "dev"
     path     = "project/k8s/overlays/dev"
+    ns       = "flightops-dev"
   }
 }
