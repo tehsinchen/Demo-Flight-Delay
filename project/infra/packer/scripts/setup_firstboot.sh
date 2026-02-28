@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+echo "[BOOT] Starting..."
+
 # Create the first-boot orchestrator and ECR refresh systemd units
 sudo tee /opt/flightops/bin/firstboot.sh >/dev/null <<'BASH'
 #!/usr/bin/env bash

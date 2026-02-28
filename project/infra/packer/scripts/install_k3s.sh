@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+echo "[K3S] Starting..."
 # Install k3s
 export INSTALL_K3S_SKIP_START=true
 export K3S_KUBECONFIG_MODE="644"

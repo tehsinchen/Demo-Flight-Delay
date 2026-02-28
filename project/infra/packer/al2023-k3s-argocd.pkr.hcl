@@ -26,7 +26,7 @@ source "amazon-ebs" "al2023" {
   # Amazon Linux 2023 (x86_64) latest
   source_ami_filter {
     filters = {
-      name                = "al2023-ami-2023.10.20260216.2-kernel-6.1-x86_64"
+      name                = "al2023-ami-2023.10.20260216.1-kernel-6.1-x86_64"
       architecture        = "x86_64"
       virtualization-type = "hvm"
       root-device-type    = "ebs"
@@ -51,32 +51,32 @@ build {
   name    = "flightops-k3s-argocd"
   sources = ["source.amazon-ebs.al2023"]
 
+
   provisioner "file" {
-    source      = "files/argocd-networking.yaml"
-    destination = "/opt/flightops/argocd/networking.yaml"
+    source      = "${path.root}/files/argocd-networking.yaml"
+    destination = "/tmp/networking.yaml"
   }
   provisioner "file" {
-    source      = "files/argocd-app-template.yaml"
-    destination = "/opt/flightops/argocd/argocd-app-template.yaml"
+    source      = "${path.root}/files/argocd-app-template.yaml"
+    destination = "/tmp/argocd-app-template.yaml"
   }
-
   provisioner "shell" {
-    script          = "scripts/prep_base.sh"
+    script          = "${path.root}/scripts/prep_base.sh"
     execute_command = "sudo -E bash '{{ .Path }}'"
   }
 
   provisioner "shell" {
-    script          = "scripts/install_k3s.sh"
+    script          = "${path.root}/scripts/install_k3s.sh"
     execute_command = "sudo -E bash '{{ .Path }}'"
   }
 
   provisioner "shell" {
-    script          = "scripts/setup_argocd.sh"
+    script          = "${path.root}/scripts/setup_argocd.sh"
     execute_command = "sudo -E bash '{{ .Path }}'"
   }
 
   provisioner "shell" {
-    script          = "scripts/setup_firstboot.sh"
+    script          = "${path.root}/scripts/setup_firstboot.sh"
     execute_command = "sudo -E bash '{{ .Path }}'"
   }
 }
