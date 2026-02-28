@@ -2,7 +2,6 @@
 set -euo pipefail
 
 # Create the first-boot orchestrator and ECR refresh systemd units
-
 sudo tee /opt/flightops/bin/firstboot.sh >/dev/null <<'BASH'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -23,80 +22,11 @@ fi
 # shellcheck disable=SC1090
 source "$CONFIG"
 
-# Start k3s
-systemctl enable k3s
-systemctl start k3s
-
-# Wait for node to be Ready
-log "Waiting for Kubernetes node to be Ready..."
-for i in {1..180}; do
-  READY=$(kubectl get nodes -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || true)
-  [[ "$READY" == "True" ]] && break
-  sleep 2
-done
-
-# Install ArgoCD (CRDs + controllers)
-log "Applying ArgoCD install manifest..."
-kubectl apply -f /opt/flightops/argocd/install.yaml
-
-# Wait for Application CRD to exist
-log "Waiting for ArgoCD CRDs..."
-for i in {1..120}; do
-  kubectl get crd applications.argoproj.io >/dev/null 2>&1 && break
-  sleep 2
-done
-
-# Make server HTTP-only (we're using Ingress on port 80)
-kubectl apply -f /opt/flightops/argocd/insecure-cm.yaml || true
-
-# Expose ArgoCD via Traefik at /argocd
-kubectl apply -f /opt/flightops/argocd/ingress.yaml || true
-
-# Ensure Traefik is up (k3s default ingress controller)
-kubectl -n kube-system rollout status deploy/traefik --timeout=180s || true
-
-# Wait for ArgoCD server to start (best-effort)
-kubectl -n argocd rollout status deploy/argocd-server --timeout=300s || true
-
-# Create ArgoCD Application for your Git repo with ECR image overrides
-APP_YAML="$(mktemp)"
-cat > "$APP_YAML" <<YAML
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: flightops
-  namespace: argocd
-spec:
-  project: default
-  source:
-    repoURL: "${GIT_URL}"
-    targetRevision: "${GIT_REVISION}"
-    path: "${GIT_PATH}"
-    kustomize:
-      images:
-        - name: frontend
-          newName: ${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/flight-ops/frontend
-          newTag: latest
-        - name: backend
-          newName: ${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/flight-ops/backend
-          newTag: latest
-        - name: crawler
-          newName: ${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/flight-ops/crawler
-          newTag: latest
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: default
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    syncOptions:
-      - CreateNamespace=true
-      - ApplyOutOfSyncOnly=true
-YAML
-
+# Create ArgoCD Application for Git repo with ECR image overrides
 log "Applying ArgoCD Application..."
-kubectl apply -f "$APP_YAML"
+sudo envsubst < /opt/flightops/argocd/argocd-app-template.yaml > /opt/flightops/argocd/argocd-app.yaml
+sudo cat /opt/flightops/argocd/argocd-app.yaml
+kubectl apply -f /opt/flightops/argocd/argocd-app.yaml
 
 # --- ECR pull-secret refresher (handles token expiry) ---
 install_refresh() {
@@ -110,7 +40,7 @@ CONFIG="/etc/flightops/config.env"
 source "$CONFIG"
 
 # Namespaces we may deploy into; adjust freely
-NAMESPACES=("default" "flightops" "flightops-dev" "logging" "argocd")
+NAMESPACES=("flightops-dev" "argocd")
 SECRET_NAME="ecr-creds"
 
 # Ensure AWS CLI exists
@@ -119,10 +49,10 @@ if ! command -v aws >/dev/null 2>&1; then
   exit 1
 fi
 
+PASS=$(aws ecr get-login-password --region "${REGION}")
 for ns in "${NAMESPACES[@]}"; do
   if kubectl get ns "$ns" >/dev/null 2>&1; then
     echo "[ecr-refresh] Updating secret in $ns"
-    PASS=$(aws ecr get-login-password --region "${REGION}")
     kubectl -n "$ns" delete secret "$SECRET_NAME" >/dev/null 2>&1 || true
     kubectl -n "$ns" create secret docker-registry "$SECRET_NAME" \
       --docker-server="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com" \

@@ -14,7 +14,8 @@ EOT
 }
 
 resource "aws_instance" "k3s" {
-  ami                         = data.aws_ami.flightops_golden.id
+  # ami                         = data.aws_ami.flightops_golden.id
+  ami                         = "ami-0ac0e4288aa341886"
   instance_type               = var.instance_type
   subnet_id                   = data.aws_subnet.selected.id
   associate_public_ip_address = true
