@@ -1,5 +1,5 @@
 locals {
-  BCRYPT=base64encode(var.argocd_admin_password)
+  BCRYPT            = base64encode(var.argocd_admin_password)
   config_env_script = <<-EOT
 #!/bin/bash
 set -euo pipefail
@@ -45,16 +45,6 @@ systemctl start k3s
 echo "[user_data] Running firstboot script..."
 /opt/flightops/bin/firstboot.sh | tee /var/log/firstboot.log
 echo "[user_data] Firstboot completed."
-
-echo "[user_data] Reset admin password"
-kubectl -n argocd patch secret argocd-secret \
-  -p "{\"stringData\":{
-        \"admin.password\":\"${local.BCRYPT}\",
-        \"admin.passwordMtime\":\"$(date +%FT%T%Z)\"
-      }}"
-kubectl -n argocd rollout restart deploy/argocd-server
-echo "[user_data] Reset completed"
-
 EOT
 }
 
