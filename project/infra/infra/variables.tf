@@ -47,7 +47,3 @@ variable "git_app" {
     ns       = "flightops-dev"
   }
 }
-
-variable "argocd_admin_password" {
-  default = "flightops"
-}

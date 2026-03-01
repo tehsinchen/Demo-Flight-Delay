@@ -1,5 +1,4 @@
 locals {
-  BCRYPT            = base64encode(var.argocd_admin_password)
   config_env_script = <<-EOT
 #!/bin/bash
 set -euo pipefail
