@@ -1,29 +1,27 @@
-# Fine‑grained PAT for GitHub Self‑Hosted Runner (Repo Level)
+# Demo-Flight-delay (IaC & GitOps)
 
-This guide explains how to create a **fine‑grained personal access token (PAT)** that can be used **by an EC2 instance** at boot to register itself as a **repo‑level** self‑hosted runner.
-
-> ⚠️ The runner does **not** use this PAT to run jobs. The PAT is only used at boot to call GitHub’s API to obtain a **short‑lived registration token** (valid ~1 hour), which is then passed to `config.sh`. [2](https://github.apidog.io/api-3489141)
+This project demonstrates a fully automated, Infrastructure as Code (IaC) approach to provisioning a microservices-based application (frontend, backend, and data crawler) on AWS. Everything from the CI/CD runners to the Kubernetes cluster is managed entirely via Terraform, Packer, and ArgoCD.
 
 ## Prerequisites
+Before deploying the infrastructure, ensure you have the following installed and configured locally:
+* AWS CLI (authenticated via aws sso login or your preferred profile)
+* Admin access to the target GitHub repository.
+* Terraform
+* Packer
 
-- You have **Admin** permission on the target repository (repo‑level runner requires admin access to create registration/remove tokens). [6](https://github.com/orgs/community/discussions/43524)
+## Deployment Guide
+### Phase 1: Setup GitHub Runner Credentials
+To allow EC2 instances to dynamically register as runners, we use a fine-grained GitHub PAT securely stored in AWS Secrets Manager.
 
-## Steps (GitHub UI)
+#### 1. Generate the PAT (GitHub UI):
+* Go to Settings → Developer settings → Personal access tokens → Fine‑grained tokens → Generate new token.
+* Name: ec2-runner-register.
+* Resource owner: Your organization or user.
+* Repository access: Only select repositories -> Pick the target repo.
+* Permissions: Administration: Read and write.
+* Generate and copy the token (ghp_...).
 
-1. In GitHub, click your avatar → **Settings** → **Developer settings** → **Personal access tokens** → **Fine‑grained tokens** → **Generate new token**. [5](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens)
-2. **Token name**: e.g., `ec2-runner-register`.
-3. **Resource owner**: select the organization or user that owns the repository. [5](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens)
-4. **Repository access**: select **Only select repositories**, then pick your target repo(s). [5](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens)
-5. **Permissions** (Repository permissions):
-   - **Administration: Read and write** — required so the token can call the self‑hosted runner registration/remove endpoints for the repository. [7](https://blog.madkoo.net/2023/07/24/register-self-hosted/)
-6. Set a **reasonable expiration** and click **Generate token**. Copy the token (`ghp_…`) now—GitHub will not show it again. [5](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens)
-
-> **Note**: Classic PATs using `repo` scope also work for this API, but fine‑grained tokens are recommended for least privilege and scoping to specific repos. [2](https://github.apidog.io/api-3489141)[5](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens)
-
-## Store the PAT in AWS Secrets Manager
-
-Create or update a secret with the fields your bootstrap script expects:
-
+#### 2. Store PAT in AWS Secrets Manager:
 ```bash
 aws secretsmanager create-secret \
   --name github/ci/runner-settings \
@@ -35,56 +33,98 @@ aws secretsmanager create-secret \
     "runner_name_prefix": "gha-runner",
     "runner_dir": "/opt/actions-runner"
   }' \
-  --region ap-southeast-1
+  --region YOUR_REGION \
+  --profile YOUR_PROFILE
 ```
-<!-- =============
-# FlightOps Demo on Single EC2 (k3s + ArgoCD + Traefik)
 
-This repo boots a **single EC2 instance** (Amazon Linux 2023) with **k3s** and **ArgoCD** baked into a **golden AMI**.  
-Your app deploys automatically from **ArgoCD** pointing at your **public GitHub repo**, and is reachable at:
-
-- **Frontend**: `http://<public-ip>/`
-- **ArgoCD UI**: `http://<public-ip>/argocd`
-
-No SSH required — **SSM Session Manager** only.  
-Images are pulled from **ECR** repos:
-
-- `flight-ops/frontend:latest`
-- `flight-ops/backend:latest`
-- `flight-ops/crawler:latest`
-
----
-
-## What gets created
-
-- **Golden AMI** with:
-  - **k3s** (Traefik + ServiceLB) → exposes host **port 80** (no port number in URL)
-  - **ArgoCD** (pinned `v2.9.6`), served on `/argocd` path (HTTP)
-  - **First-boot systemd** service:
-    - Starts k3s
-    - Applies ArgoCD manifests & Ingress
-    - Creates an **ArgoCD Application** (auto-sync, prune, self-heal)
-    - Overrides images to your **ECR** repos
-    - Sets up an **ECR pull-secret refresher** to handle expiring tokens
-- **EC2 instance** in **default VPC public subnet** with **ephemeral public IP**, HTTP open.
-- **IAM instance profile**: SSM access + ECR read
-- **ECR repositories** with lifecycle to aggressively delete **untagged** images
-- **Terraform outputs**: frontend & ArgoCD URLs + repo URIs
-
----
-
-## Prerequisites
-
-- **AWS CLI v2**, **Packer ≥ 1.9**, **Terraform ≥ 1.6**
-- An AWS account with permissions to create IAM roles, ECR repos, and EC2 instances
-- Your **app GitHub repo** is **public**
-
----
-
-## 1) Build the golden AMI (Packer)
-
+### Phase 2: Deploy Self-Hosted GitHub Runner
+#### 1. Bake the Runner AMI:
 ```bash
-cd packer
-packer init .
-packer build -var "region=ap-southeast-1" al2023-k3s-argocd.pkr.hcl
-``` -->
+cd runner/packer
+# Ensure variables in github-runner-ami.pkr.hcl meet your requirements
+make init
+make build
+```
+
+#### 2. Provision the Runner Infrastructure:
+```bash
+cd ../infra
+# Update backend.conf and variables.tf as needed
+make init
+make apply
+```
+The runner will automatically retrieve the secret at boot, install dependencies, and register itself to your GitHub repository.
+![image](images/runner_1.png)
+
+### Phase 3: Deploy Kubernetes Cluster & ArgoCD
+#### 1. Bake the k3s + ArgoCD AMI:
+```bash
+cd project/infra/packer
+# Ensure variables in al2023-k3s-argocd.pkr.hcl meet your requirements
+make init
+make build
+```
+
+#### 2. Provision the k3s Infrastructure:
+```bash
+cd ../infra
+# Update backend.conf and variables.tf as needed
+make init
+make apply
+```
+
+### Phase 4: Bootstrap Application Images (CI/CD)
+>⚠️ **Important Bootstrapping Note**:
+Upon initial deployment, the ArgoCD pods for the application will sit in an ErrImagePull state. This is expected GitOps behavior because the infrastructure has provisioned the deployment manifests, but the actual Docker images have not yet been built and pushed to the newly created ECR repositories.
+
+#### To resolve this and bring the app online:
+1. Navigate to your repository's Actions tab on GitHub.
+2. Select the Manual Build Service Images workflow.
+3. Click Run workflow and select "all" services.
+4. Wait for the pipeline to build and push images to ECR.
+5. Once complete, you can manually delete the failing pods to trigger an immediate repull.
+
+![image](images/runner_2.png)
+
+## Accessing the Application
+Once everything is green, the resources are exposed via the public IP of the k3s EC2 instance (outputted by Terraform).
+#### Application Frontend: `http://<public-ip>/`
+![image](images/frontend_1.png)![image](images/frontend_2.png)![image](images/frontend_3.png)
+
+#### ArgoCD UI: `http://<public-ip>/argocd`
+To retrieve the initial ArgoCD Admin Password:</br>
+Connect to the EC2 instance via AWS SSM Session Manager and run:
+```bash
+kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d; echo
+```
+Username is `admin`.
+
+![image](images/argocd_1.png)
+![image](images/argocd_2.png)
+
+#### GitOps
+Since `ApplyOutOfSyncOnly` is set to `true`, Argocd will sync only out-of-sync resources
+![image](images/gitops_1.png)
+![image](images/gitops_2.png)
+
+## Useful Commands for Debugging
+Since SSH is disabled, use AWS SSM to connect to the instances to run these commands.
+
+#### Instance Bootstrapping & Cloud-Init:
+```bash
+cat /var/log/cloud-init.log
+cat /var/log/cloud-init-output.log
+```
+
+#### ArgoCD:
+```bash
+kubectl -n argocd get pods
+kubectl -n argocd get svc,ingress
+kubectl -n argocd logs deploy/argocd-server -n argocd --tail=20
+kubectl -n argocd get applications.argoproj.io flightops
+```
+
+#### Kubernetes (k3s):
+```bash
+kubectl -n flightops-dev get pods
+```
