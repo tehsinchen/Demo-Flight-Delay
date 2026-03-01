@@ -1,0 +1,85 @@
+name: _build-and-push
+on:
+  workflow_call:
+    inputs:
+      service:
+        required: true
+        type: string
+      context:
+        required: true
+        type: string
+      dockerfile:
+        required: true
+        type: string
+      ecr-repo:
+        required: true
+        type: string
+    outputs:
+      image:
+        description: "Pushed image reference"
+        value: ${{ jobs.build.outputs.image }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: self-hosted
+    outputs:
+      image: ${{ steps.out.outputs.image }}
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com
+      ECR_REPO: ${{ inputs.ecr-repo }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify AWS identity (optional)
+        shell: bash
+        run: |
+          set -euo pipefail
+          aws sts get-caller-identity
+
+      - name: Ensure ECR repository exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! aws ecr describe-repositories --repository-names "$ECR_REPO" >/dev/null 2>&1; then
+            aws ecr create-repository --repository-name "$ECR_REPO" >/dev/null
+            echo "Created ECR repo: $ECR_REPO"
+          fi
+
+      - name: Login to private ECR
+        uses: aws-actions/amazon-ecr-login@v2
+        # (no registry-type: public) => logs in to PRIVATE ECR in your region/account
+
+      - name: Set tags
+        id: tags
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAGS="${ECR_REGISTRY}/${ECR_REPO}:latest"
+          echo -e "tags<<EOF" >> $GITHUB_OUTPUT
+          echo -e "${TAGS}" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Build & Push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ inputs.context }}
+          file: ${{ inputs.dockerfile }}
+          push: true
+          provenance: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: ${{ steps.tags.outputs.tags }}
+
+      - name: Output final image ref
+        id: out
+        shell: bash
+        run: |
+          IMAGE="${ECR_REGISTRY}/${ECR_REPO}:${GITHUB_SHA}"
+          echo "image=${IMAGE}" >> $GITHUB_OUTPUT
+          echo "Built and pushed ${IMAGE}"

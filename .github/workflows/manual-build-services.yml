@@ -1,0 +1,57 @@
+name: Manual Build Service Images
+
+on:
+  workflow_dispatch:
+    inputs:
+      service:
+        description: 'Which service to build?'
+        required: true
+        type: choice
+        options:
+          - frontend
+          - backend
+          - crawler
+          - all
+        default: all
+
+permissions:
+  contents: read
+
+# Avoid overlapping manual runs for same branch/service
+concurrency:
+  group: manual-${{ github.ref }}-${{ inputs.service }}
+  cancel-in-progress: true
+
+jobs:
+  build_frontend:
+    if: ${{ inputs.service == 'frontend' || inputs.service == 'all' }}
+    name: Build & Push - frontend (manual)
+    uses: ./.github/workflows/_build-and-push.yml
+    with:
+      service: frontend
+      context: project/services/frontend
+      dockerfile: project/services/frontend/Dockerfile
+      ecr-repo: ${{ vars.ECR_REPO_PREFIX }}/frontend
+    secrets: inherit
+
+  build_backend:
+    if: ${{ inputs.service == 'backend' || inputs.service == 'all' }}
+    name: Build & Push - backend (manual)
+    uses: ./.github/workflows/_build-and-push.yml
+    with:
+      service: backend
+      context: project/services/backend
+      dockerfile: project/services/backend/Dockerfile
+      ecr-repo: ${{ vars.ECR_REPO_PREFIX }}/backend
+    secrets: inherit
+
+  build_crawler:
+    if: ${{ inputs.service == 'crawler' || inputs.service == 'all' }}
+    name: Build & Push - crawler (manual)
+    uses: ./.github/workflows/_build-and-push.yml
+    with:
+      service: crawler
+      context: project/services/crawler
+      dockerfile: project/services/crawler/Dockerfile
+      ecr-repo: ${{ vars.ECR_REPO_PREFIX }}/crawler
+    secrets: inherit

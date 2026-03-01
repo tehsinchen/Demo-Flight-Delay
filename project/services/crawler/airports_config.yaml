@@ -1,0 +1,52 @@
+airports:
+  - name: "Taoyuan International Airport"
+    code: "TPE"
+    timezone: "Asia/Taipei"
+    url: "https://www.taoyuan-airport.com/api/api/flight/a_flight"
+    method: "POST"
+    payload_type: "json"
+    headers:
+      "Content-Type": "application/json"
+      "Origin": "https://www.taoyuan-airport.com"
+      "Referer": "https://www.taoyuan-airport.com/flight_depart?lang=en&k=&time=all"
+    payload:
+      ODate: "AUTO_TARGET"
+      OTimeOpen: null
+      OTimeClose: null
+      BNO: null
+      AState: "D"
+      language: "en"
+      keyword: ""
+    json_root: ""
+    mapping:
+      scheduled: "OTime"
+      actual: "RTime"
+      airline: "AName"
+      flight_no: "flightCode"
+
+  - name: "Taipei Songshan Airport"
+    code: "TSA"
+    timezone: "Asia/Taipei"
+    url: "https://www.tsa.gov.tw/api/airFlyTab/Paging"
+    method: "POST"
+    payload_type: "form"
+    headers:
+      "Content-Type": "application/x-www-form-urlencoded"
+      "Origin": "https://www.tsa.gov.tw"
+      "Referer": "https://www.tsa.gov.tw/flights/international/today?culture=2"
+    payload:
+      AirFlyLine: "1"
+      AirFlyIO: "1"
+      Limit: "999"
+      Culture: "2"
+      FlightNumber: ""
+      AirLineCode: ""
+      AirportCode: ""
+      Sort: "ExpectDepartureTime"
+      Order: "asc"
+    json_root: "rows"
+    mapping:
+      scheduled: "ExpectDepartureTime"
+      actual: "RealDepartureTime"
+      airline: "AirLineName"
+      flight_no: "FlightNumber"

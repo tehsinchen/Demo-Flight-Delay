@@ -1,0 +1,110 @@
+name: CI Orchestrator
+
+on:
+  push:
+    branches: [ main, dev ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---- Define global constants once and reuse via `needs.globals.outputs.*` ----
+  globals:
+    name: Set Global Constants
+    runs-on: self-hosted
+    outputs:
+      service_root: ${{ steps.set.outputs.service_root }}
+    steps:
+      - id: set
+        name: Define SERVICE_ROOT
+        run: |
+          # >>> Change only this line when you move your services directory <<<
+          echo "service_root=project/services" >> "$GITHUB_OUTPUT"
+  changes:
+    name: Detect Changed Paths
+    needs: [globals]
+    runs-on: self-hosted
+    outputs:
+      frontend: ${{ steps.norm.outputs.frontend }}
+      backend:  ${{ steps.norm.outputs.backend }}
+      crawler:  ${{ steps.norm.outputs.crawler }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # --- Push event ---
+      - name: Paths filter (push)
+        if: ${{ github.event_name == 'push' }}
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          token: ${{ github.token }}
+          base: ${{ github.event.before }}
+          ref:  ${{ github.sha }}
+          filters: |
+            frontend:
+              - '${{ needs.globals.outputs.service_root }}/frontend/**'
+            backend:
+              - '${{ needs.globals.outputs.service_root }}/backend/**'
+            crawler:
+              - '${{ needs.globals.outputs.service_root }}/crawler/**'
+
+      # --- Normalize outputs to guaranteed 'true'/'false' ---
+      - name: Normalize filtered outputs
+        id: norm
+        shell: bash
+        run: |
+          FRONT='${{ steps.filter.outputs.frontend }}'
+          BACK='${{ steps.filter.outputs.backend }}'
+          CRAW='${{ steps.filter.outputs.crawler }}'
+          echo "frontend=${FRONT:-false}" >> $GITHUB_OUTPUT
+          echo "backend=${BACK:-false}" >> $GITHUB_OUTPUT
+          echo "crawler=${CRAW:-false}" >> $GITHUB_OUTPUT
+      - name: Debug normalized outputs
+        run: |
+          echo "frontend=${{ steps.norm.outputs.frontend }}"
+          echo "backend=${{ steps.norm.outputs.backend }}"
+          echo "crawler=${{ steps.norm.outputs.crawler }}"
+
+  # --- A) Build & Push images to ECR (only when changed) ---
+  build_frontend:
+    needs: [globals, changes]
+    if: ${{ fromJSON(needs.changes.outputs.frontend) }}
+    name: Build & Push - frontend
+    uses: ./.github/workflows/_build-and-push.yml
+    with:
+      service: frontend
+      context: ${{ needs.globals.outputs.service_root }}/frontend
+      dockerfile: ${{ needs.globals.outputs.service_root }}/frontend/Dockerfile
+      ecr-repo: ${{ vars.ECR_REPO_PREFIX }}/frontend
+    secrets: inherit
+
+  build_backend:
+    needs: [globals, changes]
+    if: ${{ fromJSON(needs.changes.outputs.backend) }}
+    name: Build & Push - backend
+    uses: ./.github/workflows/_build-and-push.yml
+    with:
+      service: backend
+      context: ${{ needs.globals.outputs.service_root }}/backend
+      dockerfile: ${{ needs.globals.outputs.service_root }}/backend/Dockerfile
+      ecr-repo: ${{ vars.ECR_REPO_PREFIX }}/backend
+    secrets: inherit
+
+  build_crawler:
+    needs: [globals, changes]
+    if: ${{ fromJSON(needs.changes.outputs.crawler) }}
+    name: Build & Push - crawler
+    uses: ./.github/workflows/_build-and-push.yml
+    with:
+      service: crawler
+      context: ${{ needs.globals.outputs.service_root }}/crawler
+      dockerfile: ${{ needs.globals.outputs.service_root }}/crawler/Dockerfile
+      ecr-repo: ${{ vars.ECR_REPO_PREFIX }}/crawler
+    secrets: inherit
