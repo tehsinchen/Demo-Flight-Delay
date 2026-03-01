@@ -18,10 +18,10 @@ variable "runner_instance_type" {
   default = "t3.medium"
 }
 
-variable "runner_ami_id" {
-  type    = string
-  default = "ami-05bcc118c5d3cb7a1"
-}
+# variable "runner_ami_id" {
+#   type    = string
+#   default = "ami-05bcc118c5d3cb7a1"
+# }
 
 variable "secret_name" {
   type    = string

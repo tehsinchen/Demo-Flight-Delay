@@ -1,5 +1,18 @@
+data "aws_caller_identity" "current" {}
+
+# Find the latest baked AMI by name prefix
+data "aws_ami" "runner_golden" {
+  most_recent = true
+  owners      = [data.aws_caller_identity.current.account_id]
+
+  filter {
+    name   = "name"
+    values = ["demo-flight-delay-runner-ubuntu-*"]
+  }
+}
+
 resource "aws_instance" "runner" {
-  ami                         = var.runner_ami_id
+  ami                         = data.aws_ami.runner_golden.id
   instance_type               = var.runner_instance_type
   subnet_id                   = local.runner_subnet_id
   vpc_security_group_ids      = [aws_security_group.runner.id]
