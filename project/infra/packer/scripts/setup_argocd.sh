@@ -48,6 +48,7 @@ done
 log "Applying ArgoCD install manifest..."
 kubectl create namespace argocd
 kubectl apply -n argocd -f /opt/flightops/argocd/install.yaml --server-side --force-conflicts
+kubectl patch configmap/argocd-cm -n argocd --type merge -p '{"data":{"kustomize.buildOptions":"--enable-helm"}}'
 
 log "Waiting for ArgoCD CRDs..."
 for i in {1..120}; do
