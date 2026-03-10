@@ -1,0 +1,21 @@
+appNamespace: flightops
+loggingNamespace: logging
+
+images:
+  frontend:
+    repository: frontend
+    tag: "latest"
+  backend:
+    repository: backend
+    tag: "latest"
+  crawler:
+    repository: crawler
+    tag: "latest"
+
+# Toggle the entire ELK stack
+logging:
+  enabled: false # Disabled by default, overridden in dev/prod
+
+# Resource and replica management
+backend:
+  replicas: 1

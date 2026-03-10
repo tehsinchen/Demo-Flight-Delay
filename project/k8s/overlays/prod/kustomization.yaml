@@ -3,4 +3,14 @@ kind: Kustomization
 
 resources:
   - namespaces.yaml
-  - app
+
+helmGlobals:
+  chartHome: ../../charts
+
+helmCharts:
+  - name: flightops
+    valuesFile: values-prod.yaml
+    releaseName: flightops-prod
+
+patches:
+  - path: app/patches/backend-replicas.yaml

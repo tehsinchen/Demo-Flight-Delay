@@ -3,5 +3,19 @@ kind: Kustomization
 
 resources:
   - namespaces.yaml
-  - app
-  # - logging
+
+helmGlobals:
+  chartHome: ../../charts
+
+helmCharts:
+  - name: flightops
+    valuesFile: values-dev.yaml
+    releaseName: flightops-dev
+
+patches:
+  - path: app/patches/backend-resources.yaml
+  - path: app/patches/crawler-cleanup.yaml
+  - path: app/patches/frontend-resources.yaml
+  - path: app/patches/mysql-storage.yaml
+  # - path: logging/patches/es-small.yaml
+  # - path: logging/patches/kibana-small.yaml

@@ -2,6 +2,7 @@ apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: crawler
+  namespace: flightops-dev
 spec:
   successfulJobsHistoryLimit: 1
   failedJobsHistoryLimit: 2

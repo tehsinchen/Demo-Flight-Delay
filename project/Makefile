@@ -20,9 +20,13 @@ serving:
 	kubectl -n kube-system port-forward svc/traefik 8080:80
 
 dev:
-	kubectl apply -k k8s/overlays/dev
+	kustomize build k8s/overlays/dev --enable-helm | kubectl apply -f -
+dev_delete:
+	kustomize build k8s/overlays/dev --enable-helm | kubectl delete -f -
 
 prod:
-	kubectl apply -k k8s/overlays/prod
+	kustomize build k8s/overlays/prod --enable-helm | kubectl apply -f -
+prod_delete:
+	kustomize build k8s/overlays/prod --enable-helm | kubectl delete -f -
 
-.PHONY: cluster_create cluster_delete cluster_start cluster_stop image_import serving dev prod
+.PHONY: cluster_create cluster_delete cluster_start cluster_stop image_import serving dev dev_delete prod prod_delete

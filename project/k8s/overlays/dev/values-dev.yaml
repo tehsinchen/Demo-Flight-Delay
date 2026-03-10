@@ -1,0 +1,10 @@
+appNamespace: flightops-dev
+
+logging:
+  enabled: false
+
+images:
+  frontend:
+    tag: "latest"
+  backend:
+    tag: "latest"
