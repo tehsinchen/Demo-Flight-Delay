@@ -1,7 +1,7 @@
 appNamespace: flightops-dev
 
 logging:
-  enabled: false
+  enabled: true
 
 images:
   frontend:
