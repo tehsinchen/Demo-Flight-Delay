@@ -12,3 +12,8 @@ output "argocd_url" {
   description = "ArgoCD UI URL"
   value       = "http://${aws_instance.k3s.public_ip}/argocd"
 }
+
+output "elk_url" {
+  description = "ELK UI URL"
+  value       = "http://${aws_instance.k3s.public_ip}/kibana"
+}

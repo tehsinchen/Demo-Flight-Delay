@@ -36,10 +36,10 @@ resource "aws_ecr_lifecycle_policy" "repo_policies" {
   policy     = local.ecr_lifecycle_untagged
 }
 
-output "ecr_repo_urls" {
-  value = {
-    for k, v in aws_ecr_repository.repos :
-    k => v.repository_url
-  }
-  description = "ECR repository URIs"
-}
+# output "ecr_repo_urls" {
+#   value = {
+#     for k, v in aws_ecr_repository.repos :
+#     k => v.repository_url
+#   }
+#   description = "ECR repository URIs"
+# }

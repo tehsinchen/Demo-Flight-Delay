@@ -11,9 +11,9 @@ variable "aws_region" {
 }
 
 variable "instance_type" {
-  description = "EC2 instance type for the k3s+ArgoCD host"
+  description = "EC2 instance type for the k3s+ArgoCD+ELK host"
   type        = string
-  default     = "t3.medium"
+  default     = "t3.large"
 }
 
 variable "root_volume_size" {
